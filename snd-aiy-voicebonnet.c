@@ -37,7 +37,7 @@ static struct snd_soc_jack_pin headset_jack_pin = {
 
 static int snd_rpi_aiy_voicebonnet_init(struct snd_soc_pcm_runtime *rtd) {
   int ret;
-  struct snd_soc_dai *codec_dai = rtd->codec_dai;
+  struct snd_soc_dai *codec_dai = asoc_rtd_to_codec(rtd, 0);
   struct snd_soc_card *card = rtd->card;
   rt5645_sel_asrc_clk_src(codec_dai->component,
                           RT5645_DA_STEREO_FILTER |
@@ -49,7 +49,7 @@ static int snd_rpi_aiy_voicebonnet_init(struct snd_soc_pcm_runtime *rtd) {
   ret = snd_soc_dai_set_sysclk(codec_dai, RT5645_SCLK_S_MCLK, PLATFORM_CLOCK,
                                SND_SOC_CLOCK_IN);
 
-  ret = snd_soc_card_jack_new(card, "Headphone Jack",
+  ret = snd_soc_card_jack_new_pins(card, "Headphone Jack",
                               SND_JACK_HEADPHONE,
                               &headset_jack,
                               &headset_jack_pin, 1);
@@ -66,8 +66,8 @@ static int snd_rpi_aiy_voicebonnet_hw_params(
     struct snd_pcm_hw_params *params) {
   int ret = 0;
   struct snd_soc_pcm_runtime *rtd = substream->private_data;
-  struct snd_soc_dai *cpu_dai = rtd->cpu_dai;
-  struct snd_soc_dai *codec_dai = rtd->codec_dai;
+  struct snd_soc_dai *cpu_dai = asoc_rtd_to_cpu(rtd, 0);
+  struct snd_soc_dai *codec_dai = asoc_rtd_to_codec(rtd, 0);
 
   dev_dbg(rtd->dev, "cpu: %s codec: %s\n", cpu_dai->name, codec_dai->name);
   dev_dbg(rtd->dev, " rate: %d width: %d fmt: %d\n", params_rate(params),
@@ -116,11 +116,19 @@ static const struct snd_soc_pcm_stream snd_rpi_googlevoicehat_params = {
     .rates = SNDRV_PCM_RATE_8000_96000,
 };
 
+SND_SOC_DAILINK_DEF(rpi_voicebonnet,
+	DAILINK_COMP_ARRAY(COMP_CPU("rpi-voicebonnet-i2s.1.auto")));
+SND_SOC_DAILINK_DEF(codec,
+	DAILINK_COMP_ARRAY(COMP_CODEC("rpi-voicebonnet", "rt5645-aif1")));
+SND_SOC_DAILINK_DEF(platform,
+	DAILINK_COMP_ARRAY(COMP_PLATFORM("rpi-voicebonnet.0.auto")));
+
+
 static struct snd_soc_dai_link snd_rpi_aiy_voicebonnet_dai[] = {
     {
         .name = "rt5645",
         .stream_name = "Google AIY Voice Bonnet SoundCard HiFi",
-        .codec_dai_name = "rt5645-aif1",
+		SND_SOC_DAILINK_REG(rpi_voicebonnet, codec, platform),
         .dai_fmt =
             SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_NB_NF | SND_SOC_DAIFMT_CBS_CFS,
         .ops = &snd_rpi_aiy_voicebonnet_ops,
@@ -176,20 +184,20 @@ static int snd_rpi_aiy_voicebonnet_probe(
     struct device_node *i2s_node;
     struct snd_soc_dai_link *dai = &snd_rpi_aiy_voicebonnet_dai[0];
 
-    dai->codec_name = NULL;
-    dai->codec_of_node =
+    dai->codecs[0].name = NULL;
+    dai->codecs[0].of_node =
         of_parse_phandle(pdev->dev.of_node, "aiy-voicebonnet,audio-codec", 0);
-    if (!dai->codec_of_node) {
+    if (!dai->codecs[0].of_node) {
       dev_err(&pdev->dev, "Couldn't parse aiy-voicebonnet,audio-codec\n");
       return -EINVAL;
     }
 
     i2s_node = of_parse_phandle(pdev->dev.of_node, "i2s-controller", 0);
     if (i2s_node) {
-      dai->cpu_dai_name = NULL;
-      dai->cpu_of_node = i2s_node;
-      dai->platform_name = NULL;
-      dai->platform_of_node = i2s_node;
+      dai->cpus[0].dai_name = NULL;
+      dai->cpus[0].of_node = i2s_node;
+      dai->platforms[0].name = NULL;
+      dai->platforms[0].of_node = i2s_node;
     }
   }
 

@@ -1,0 +1,9 @@
+*.cmd
+*.o
+*.ko
+*.o.*
+*.mod
+*.mod.*
+dkms.conf
+*.symvers
+modules.order

@@ -661,7 +661,11 @@ static void bcm2835_i2s_stop(struct bcm2835_i2s_dev *dev,
 			BCM2835_I2S_CS_A_REG, mask, 0);
 
 	/* Stop also the clock when not SND_SOC_DAIFMT_CONT */
-	if (!dai->active && !(dev->fmt & SND_SOC_DAIFMT_CONT))
+	if ((((substream->stream == SNDRV_PCM_STREAM_PLAYBACK) &&
+		 !snd_soc_dai_stream_active(dai, SNDRV_PCM_STREAM_CAPTURE)) ||
+		((substream->stream == SNDRV_PCM_STREAM_CAPTURE) &&
+		 !snd_soc_dai_stream_active(dai, SNDRV_PCM_STREAM_PLAYBACK))) && 
+		!(dev->fmt & SND_SOC_DAIFMT_CONT))
 		bcm2835_i2s_stop_clock(dev);
 }
 
@@ -703,7 +707,10 @@ static int bcm2835_i2s_startup(struct snd_pcm_substream *substream,
 {
 	struct bcm2835_i2s_dev *dev = snd_soc_dai_get_drvdata(dai);
 
-	if (dai->active)
+	if (((substream->stream == SNDRV_PCM_STREAM_PLAYBACK) &&
+		 snd_soc_dai_stream_active(dai, SNDRV_PCM_STREAM_PLAYBACK)) ||
+		((substream->stream == SNDRV_PCM_STREAM_CAPTURE) &&
+		 snd_soc_dai_stream_active(dai, SNDRV_PCM_STREAM_CAPTURE)))
 		return 0;
 
 	/* Should this still be running stop it */
@@ -731,7 +738,8 @@ static void bcm2835_i2s_shutdown(struct snd_pcm_substream *substream,
 	bcm2835_i2s_stop(dev, substream, dai);
 
 	/* If both streams are stopped, disable module and clock */
-	if (dai->active)
+	if (snd_soc_dai_stream_active(dai, SNDRV_PCM_STREAM_PLAYBACK) ||
+		snd_soc_dai_stream_active(dai, SNDRV_PCM_STREAM_CAPTURE))
 		return;
 
 	/* Disable the module */
@@ -791,8 +799,8 @@ static struct snd_soc_dai_driver bcm2835_i2s_dai = {
 				| SNDRV_PCM_FMTBIT_S32_LE
 		},
 	.ops = &bcm2835_i2s_dai_ops,
-	.symmetric_rates = 1,
-	.symmetric_samplebits = 1,
+	.symmetric_rate = 1,
+	.symmetric_sample_bits = 1,
 };
 
 static bool bcm2835_i2s_volatile_reg(struct device *dev, unsigned int reg)
